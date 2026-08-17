@@ -36,6 +36,18 @@ importers:
         specifier: ^2.1.8
         version: 2.1.9(@types/node@22.20.1)
 
+  apps/worker:
+    dependencies:
+      '@minhatv/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@minhatv/db':
+        specifier: workspace:*
+        version: link:../../packages/db
+      '@minhatv/yt':
+        specifier: workspace:*
+        version: link:../../packages/yt
+
   packages/core: {}
 
   packages/db:

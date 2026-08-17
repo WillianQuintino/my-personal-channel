@@ -1,0 +1,91 @@
+# Agendador dos jobs.
+#
+# Por que aqui e não no Vercel Cron: o plano Hobby limita cron a **1× por dia**, com
+# precisão de hora e `maxDuration` de 10 s. Expressões como `0 * * * *` ou `*/30 * * * *`
+# falham no deploy. A detecção de lives precisa rodar a cada poucos minutos, então o
+# agendamento sai da Vercel e vem para cá — gratuito, com granularidade de minutos, e
+# igual nos dois planos, o que não amarra a decisão de assinar Pro depois.
+#
+# A cadência do GitHub Actions é "melhor esforço" e pode atrasar alguns minutos. É
+# aceitável: o fallback para a grade VOD cobre a janela em que uma live já começou e
+# ainda não foi detectada.
+#
+# Requer os segredos `APP_BASE_URL` e `CRON_SECRET` no repositório.
+
+name: Jobs agendados
+
+on:
+  schedule:
+    # Detecção de lives: o job mais sensível a atraso.
+    - cron: '*/5 * * * *'
+    # Pools e inserção a quente.
+    - cron: '*/15 * * * *'
+    # Manutenção diária, às 04:10 UTC (01:10 em São Paulo).
+    - cron: '10 4 * * *'
+  workflow_dispatch:
+    inputs:
+      job:
+        description: 'Nome do job (vazio = todos os da cadência diária)'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  disparar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Escolhe os jobs pela cadência que disparou
+        id: escolher
+        env:
+          CRON: ${{ github.event.schedule }}
+          MANUAL: ${{ inputs.job }}
+        run: |
+          set -euo pipefail
+          if [ -n "${MANUAL:-}" ]; then
+            echo "jobs=${MANUAL}" >> "$GITHUB_OUTPUT"
+          elif [ "${CRON:-}" = '*/5 * * * *' ]; then
+            echo "jobs=detectLives" >> "$GITHUB_OUTPUT"
+          elif [ "${CRON:-}" = '*/15 * * * *' ]; then
+            echo "jobs=refreshPools hotInsertScan" >> "$GITHUB_OUTPUT"
+          else
+            echo "jobs=refreshSubscriptions refreshAffinity materializeGrids purgeCache prunePrograms" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Executa
+        env:
+          BASE_URL: ${{ secrets.APP_BASE_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          JOBS: ${{ steps.escolher.outputs.jobs }}
+        run: |
+          set -euo pipefail
+          if [ -z "${BASE_URL:-}" ] || [ -z "${CRON_SECRET:-}" ]; then
+            echo "::error::defina os segredos APP_BASE_URL e CRON_SECRET"
+            exit 1
+          fi
+
+          falhou=0
+          for job in $JOBS; do
+            echo "::group::$job"
+            # `--max-time` protege contra endpoint pendurado; o job é retomável, então
+            # cortar no meio é seguro — a próxima invocação continua de onde parou.
+            corpo=$(mktemp)
+            codigo=$(curl -sS -o "$corpo" -w '%{http_code}' \
+              --max-time 60 \
+              -X POST \
+              -H "authorization: Bearer $CRON_SECRET" \
+              "$BASE_URL/api/cron/$job" || echo 000)
+
+            cat "$corpo"
+            echo
+            if [ "$codigo" != "200" ]; then
+              echo "::error::$job devolveu HTTP $codigo"
+              falhou=1
+            fi
+            echo "::endgroup::"
+          done
+
+          # Falha registrada como job vermelho: um cron que erra em silêncio é pior que
+          # um cron que não existe.
+          exit $falhou

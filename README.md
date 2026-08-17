@@ -67,11 +67,39 @@ Por isso `packages/core` é livre de I/O e o tempo entra sempre por parâmetro: 
 packages/core/    Motor de grade/EPG — TypeScript puro, sem I/O, 145 testes
 packages/yt/      Data API v3: cota, elegibilidade, lives, Takeout — 148 testes
 packages/player/  Máquina de estados do canal + IFrame API — 45 testes
-packages/db/      Drizzle ORM + migrations                               (a fazer)
+packages/db/      Schema Drizzle, repositórios, Neon + PGlite — 102 testes
+apps/worker/      Jobs fatiados e retomáveis — 39 testes
 apps/web/         Next.js + PWA, interface e EPG                         (a fazer)
 apps/mobile/      Capacitor envolvendo o build web (Android)             (a fazer)
-apps/worker/      Cron: refresh de pools, detecção de live, purga de 30d  (a fazer)
 ```
+
+## Jobs
+
+Todos são funções puras que recebem dependências explícitas, e todos são **fatiados e
+retomáveis**: cada invocação processa uma fatia e grava o cursor. Isso nasceu do
+`maxDuration` de 10 s do Vercel Cron, mas é o desenho correto de qualquer forma — um job
+que só deixa o estado consistente se rodar até o fim quebra no primeiro timeout.
+
+| Job                    | O que faz                                    | Cadência | Cota |
+| ---------------------- | -------------------------------------------- | -------- | ---- |
+| `refreshSubscriptions` | Sincroniza inscrições e playlists de uploads | diária   | sim  |
+| `refreshPools`         | Atualiza pools de vídeo, em camadas          | 15 min   | sim  |
+| `refreshAffinity`      | Recalcula o ranking das três fontes          | diária   | não  |
+| `detectLives`          | Detecta transmissões pelo caminho barato     | 5 min    | sim  |
+| `materializeGrids`     | Materializa a grade de hoje e amanhã         | diária   | não  |
+| `hotInsertScan`        | Insere vídeos novos que passam pelo portão   | 15 min   | não  |
+| `purgeCache`           | R3: apaga cache com mais de 30 dias          | diária   | não  |
+| `prunePrograms`        | Retenção de 60 dias do histórico             | diária   | não  |
+
+```bash
+pnpm --filter @minhatv/worker run:job detectLives
+pnpm --filter @minhatv/worker run:job refreshPools --max-items 10
+```
+
+O agendador é um workflow do GitHub Actions (`.github/workflows/cron.yml`), e não o
+Vercel Cron: o plano Hobby limita cron a **1× por dia** com 10 s de execução, e
+expressões como `*/15 * * * *` falham no deploy. O workflow bate nos mesmos endpoints,
+autenticado por `CRON_SECRET`, e funciona igual nos dois planos.
 
 ## Desenvolvimento
 
@@ -84,7 +112,8 @@ pnpm lint
 pnpm format
 ```
 
-Requer Node 22+ e pnpm 10+.
+Requer Node 22+ e pnpm 10+. Os testes de banco rodam contra PGlite (Postgres em WASM),
+então não é preciso Docker nem servidor Postgres.
 
 ## Antes de rodar com dados reais
 
