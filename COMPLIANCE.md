@@ -14,30 +14,33 @@ Documentos normativos:
 
 ## Situação
 
-| #   | Restrição                                                           | Como é atendida                                                                                              | Cobertura                                    |
-| --- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ | -------------------------------------------- |
-| R1  | Histórico de exibição não existe na API (depreciado em 2016)        | Ranking vem de 3 fontes: import do Takeout, inscrições e tracking interno                                    | ⏳ pendente (M6)                             |
-| R2  | `search.list` custa 100 de 10.000 unidades/dia                      | Pools montados por `playlistItems`/`videos` (1u). `search.list` só sob ação explícita, com rate limit        | ⏳ pendente (M1)                             |
-| R3  | Dados da API expiram em 30 dias corridos                            | Coluna `refreshedAt` em todo cache + job noturno de revalidação/purga                                        | ⏳ pendente (M1)                             |
-| R4  | Scraping proibido, inclusive obter dados raspados de terceiros      | Só a API oficial. Sem bookmarklet, sem yt-dlp, sem Apify/EnsembleData/Zyla                                   | ✅ por construção                            |
-| R5  | Proibido overlay na frente do player, inclusive sobre os controles  | Chrome (número do canal, badge LIVE, EPG) fica fora do retângulo do iframe; no zapping o player é desmontado | ⏳ pendente (M3)                             |
-| R6  | Viewport mínima 200×200 (recomendado ≥480×270 em 16:9)              | CSS garante mínimo; nenhum modo de exibição encolhe o player abaixo disso                                    | ⏳ pendente (M3)                             |
-| R7  | Um só player com autoplay por tela; autoplay só com >50% visível    | Um único player montado por vez; sem pré-carregamento do próximo vídeo                                       | ⏳ pendente (M3)                             |
-| R8  | Embedding Restriction: só web e apps mobile/web não-embutidos       | Sem app de Android TV / Fire TV. TV apenas via navegador da smart TV ou espelhamento pelo usuário            | ✅ decisão de escopo                         |
-| R9  | Atribuição ao YouTube obrigatória e não obscurecível                | Marca YouTube + nome do canal + título + link "Assistir no YouTube" sempre visíveis                          | ⏳ pendente (M3)                             |
-| R10 | Proibido cobrar pelo conteúdo ou inserir ads próprios               | Produto gratuito, sem ads, sem bloquear ou adiar os ads do YouTube                                           | ✅ por construção                            |
-| R11 | `youtube.readonly` é escopo sensível                                | Sem verificação OAuth: 100 usuários no total, consentimento expira em 7 dias. Documentado no README          | ✅ documentado                               |
-| R12 | Navegadores bloqueiam autoplay com som                              | O botão "Ligar TV" é o gesto exigido; início mudo com `unMute` no gesto como reforço                         | ⏳ pendente (M3)                             |
-| R13 | Vídeos podem ser não-embutíveis, bloqueados, restritos ou removidos | Filtro prévio (`status.embeddable`, `privacyStatus`, `regionRestriction`) + watchdog de 8s + `onError`       | 🟡 parcial — motor pronto, ingestão pendente |
+| #   | Restrição                                                           | Como é atendida                                                                                                                            | Cobertura                         |
+| --- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------- |
+| R1  | Histórico de exibição não existe na API (depreciado em 2016)        | `parseWatchHistory` (Takeout) + `computeAffinity` combinando Takeout, inscrições, favoritos e tracking interno com decaimento              | 🟡 parcial — falta a UI de import |
+| R2  | `search.list` custa 100 de 10.000 unidades/dia                      | `QuotaLedger` debita antes de cada chamada e recusa quando não cabe; reserva de 20% protege o interativo dos jobs de fundo                 | ✅ coberto (15 testes)            |
+| R3  | Dados da API expiram em 30 dias corridos                            | `refreshedAtMs` em todo registro; `isCacheExpired`/`needsRefresh` com folga de 5 dias; vencido é recusado antes de qualquer outra checagem | 🟡 parcial — falta o job de purga |
+| R4  | Scraping proibido, inclusive obter dados raspados de terceiros      | Só a API oficial. Sem bookmarklet, sem yt-dlp, sem Apify/EnsembleData/Zyla                                                                 | ✅ por construção                 |
+| R5  | Proibido overlay na frente do player, inclusive sobre os controles  | Chrome (número do canal, badge LIVE, EPG) fica fora do retângulo do iframe; no zapping o player é desmontado                               | ⏳ pendente (M3)                  |
+| R6  | Viewport mínima 200×200 (recomendado ≥480×270 em 16:9)              | CSS garante mínimo; nenhum modo de exibição encolhe o player abaixo disso                                                                  | ⏳ pendente (M3)                  |
+| R7  | Um só player com autoplay por tela; autoplay só com >50% visível    | Um único player montado por vez; sem pré-carregamento do próximo vídeo                                                                     | ⏳ pendente (M3)                  |
+| R8  | Embedding Restriction: só web e apps mobile/web não-embutidos       | Sem app de Android TV / Fire TV. TV apenas via navegador da smart TV ou espelhamento pelo usuário                                          | ✅ decisão de escopo              |
+| R9  | Atribuição ao YouTube obrigatória e não obscurecível                | Marca YouTube + nome do canal + título + link "Assistir no YouTube" sempre visíveis                                                        | ⏳ pendente (M3)                  |
+| R10 | Proibido cobrar pelo conteúdo ou inserir ads próprios               | Produto gratuito, sem ads, sem bloquear ou adiar os ads do YouTube                                                                         | ✅ por construção                 |
+| R11 | `youtube.readonly` é escopo sensível                                | Sem verificação OAuth: 100 usuários no total, consentimento expira em 7 dias. Documentado no README                                        | ✅ documentado                    |
+| R12 | Navegadores bloqueiam autoplay com som                              | O botão "Ligar TV" é o gesto exigido; início mudo com `unMute` no gesto como reforço                                                       | ⏳ pendente (M3)                  |
+| R13 | Vídeos podem ser não-embutíveis, bloqueados, restritos ou removidos | Filtro prévio (`checkEligibility`) + `onError` e re-fluxo no motor. Falta só o watchdog de 8s, que vive no player                          | 🟡 parcial — falta o watchdog     |
 
 ## R13 em detalhe
 
 É a causa número um de "canal travado", então tem três camadas independentes:
 
-1. **Filtro prévio** — `packages/yt` só admite no pool vídeos com
-   `status.embeddable === true`, `privacyStatus === 'public'`,
-   `uploadStatus === 'processed'` e região do usuário fora de
-   `contentDetails.regionRestriction.blocked`. _(pendente, M1)_
+1. **Filtro prévio** — `checkEligibility` em `packages/yt` exige
+   `embeddable === true`, `privacyStatus === 'public'`,
+   `uploadStatus === 'processed'`, ausência de classificação indicativa e região do
+   usuário fora de `regionRestriction.blocked` (respeitando também `allowed`).
+   `buildPool` devolve a contagem por motivo de recusa, para a interface poder
+   explicar um pool pequeno em vez de mostrar canal vazio sem justificativa.
+   **Implementado**, 29 testes.
 2. **Watchdog de carregamento** — se o player não atingir `PLAYING` em 8s após o
    `load`, trata como falha. Sem isso o canal congela em tela preta sem nenhum evento
    de erro. _(pendente, M3)_

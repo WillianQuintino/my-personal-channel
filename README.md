@@ -50,7 +50,7 @@ Por isso `packages/core` é livre de I/O e o tempo entra sempre por parâmetro: 
 
 ```
 packages/core/    Motor de grade/EPG — TypeScript puro, sem I/O, 145 testes
-packages/yt/      Cliente da Data API v3 com contabilidade de quota      (a fazer)
+packages/yt/      Data API v3: cota, elegibilidade, lives, Takeout — 148 testes
 packages/db/      Drizzle ORM + migrations                               (a fazer)
 apps/web/         Next.js + PWA, player IFrame                           (a fazer)
 apps/mobile/      Capacitor envolvendo o build web (Android)             (a fazer)
