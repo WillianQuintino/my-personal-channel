@@ -1,5 +1,5 @@
 {
-  "name": "@minhatv/core",
+  "name": "@minhatv/player",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -9,13 +9,12 @@
     ".": {
       "types": "./src/index.ts",
       "default": "./src/index.ts"
-    },
-    "./fixtures": {
-      "types": "./src/fixtures.ts",
-      "default": "./src/fixtures.ts"
     }
   },
   "scripts": {
     "build": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@minhatv/core": "workspace:*"
   }
 }

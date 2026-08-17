@@ -36,6 +36,21 @@ live começando agora — senão todo upload de todo canal viraria uma reordena�
 grade nunca assentaria. Limites anti-turbulência: no máximo 6 inserções por dia e
 20 min entre elas.
 
+## Três camadas contra canal travado
+
+Vídeo não-embutível, removido ou bloqueado na região é a causa número um de canal
+congelado, então há três defesas independentes:
+
+1. **Filtro prévio** — `checkEligibility` recusa o vídeo antes de ele entrar na grade,
+   e `buildPool` reporta a contagem por motivo de recusa, para a interface poder
+   explicar um pool pequeno.
+2. **Watchdog de 8s** — se o player não chega a `PLAYING`, trata como falha. É a
+   camada que pega a pior variante do problema: há vídeos que não iniciam no iframe e
+   **nunca** disparam `onError`, e sem watchdog o canal fica em tela preta sem nada nos
+   logs.
+3. **`onError`** — códigos 2, 5, 100, 101 e 150 marcam o vídeo e disparam re-fluxo
+   pelo relógio, emendando no instante do erro em vez de deixar um vão.
+
 ## Determinismo
 
 A grade materializada é sempre `base(seed) + patches em ordem de seqNo`, com
@@ -51,8 +66,9 @@ Por isso `packages/core` é livre de I/O e o tempo entra sempre por parâmetro: 
 ```
 packages/core/    Motor de grade/EPG — TypeScript puro, sem I/O, 145 testes
 packages/yt/      Data API v3: cota, elegibilidade, lives, Takeout — 148 testes
+packages/player/  Máquina de estados do canal + IFrame API — 45 testes
 packages/db/      Drizzle ORM + migrations                               (a fazer)
-apps/web/         Next.js + PWA, player IFrame                           (a fazer)
+apps/web/         Next.js + PWA, interface e EPG                         (a fazer)
 apps/mobile/      Capacitor envolvendo o build web (Android)             (a fazer)
 apps/worker/      Cron: refresh de pools, detecção de live, purga de 30d  (a fazer)
 ```

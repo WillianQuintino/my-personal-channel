@@ -32,6 +32,12 @@ importers:
 
   packages/core: {}
 
+  packages/player:
+    dependencies:
+      '@minhatv/core':
+        specifier: workspace:*
+        version: link:../core
+
   packages/yt:
     dependencies:
       '@minhatv/core':

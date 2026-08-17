@@ -42,12 +42,16 @@ Documentos normativos:
    explicar um pool pequeno em vez de mostrar canal vazio sem justificativa.
    **Implementado**, 29 testes.
 2. **Watchdog de carregamento** — se o player não atingir `PLAYING` em 8s após o
-   `load`, trata como falha. Sem isso o canal congela em tela preta sem nenhum evento
-   de erro. _(pendente, M3)_
+   `load`, `ChannelEngine.tick` trata como falha. É a falha mais insidiosa do gênero:
+   há vídeos que não iniciam no iframe e **nunca** disparam `onError`, então sem esta
+   camada o canal fica em tela preta para sempre, sem nada nos logs.
+   **Implementado** em `packages/player`, com código de erro sintético `-1` para
+   distinguir do que veio do player.
 3. **`onError`** — códigos 2, 5, 100, 101 e 150 marcam o vídeo como injogável e
-   disparam re-fluxo pelo relógio.
-   **Implementado**: `isUnplayableError`, `describeErrorCode` e `dropUnplayable` em
-   `packages/core`, com 9 testes cobrindo falhas isoladas e consecutivas.
+   disparam re-fluxo pelo relógio. Depois de três falhas seguidas, o motor passa a
+   `trouble` e a interface admite o problema — insistir em silêncio é pior.
+   **Implementado**: `isUnplayableError`/`dropUnplayable` em `packages/core` e
+   `ChannelEngine.onError` em `packages/player`.
 
 ## Invariantes do motor de grade já garantidos por teste
 
