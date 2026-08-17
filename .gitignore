@@ -1,0 +1,27 @@
+node_modules/
+dist/
+build/
+coverage/
+.next/
+out/
+
+# Capacitor / Android
+android/
+ios/
+*.apk
+*.aab
+*.keystore
+
+# Env & secrets — nunca comitar tokens do Google
+.env
+.env.*
+!.env.example
+
+# Dados pessoais: histórico do Google Takeout jamais entra no repo
+takeout/
+*watch-history*.json
+
+.DS_Store
+*.log
+.vitest/
+.eslintcache

@@ -1,0 +1,11 @@
+# Arquivos gerados por ferramenta. Reformatá-los é contraproducente: a ferramenta os
+# reescreve no formato dela na próxima execução e o `format:check` volta a falhar.
+pnpm-lock.yaml
+packages/db/migrations/
+
+# Saídas de build
+dist/
+build/
+.next/
+out/
+coverage/
