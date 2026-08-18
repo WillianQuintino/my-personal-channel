@@ -101,6 +101,29 @@ Vercel Cron: o plano Hobby limita cron a **1× por dia** com 10 s de execução,
 expressões como `*/15 * * * *` falham no deploy. O workflow bate nos mesmos endpoints,
 autenticado por `CRON_SECRET`, e funciona igual nos dois planos.
 
+### Ativar o agendador
+
+**O agendamento está pausado de propósito.** Enquanto `apps/web` não existir, não há rota
+`/api/cron/*` para chamar, e um cron ativo só produziria falhas — foi exatamente o que
+aconteceu na primeira versão: um e-mail de erro a cada 5 minutos.
+
+Para ligar, nesta ordem:
+
+1. **Publicar `apps/web`**, com as rotas `POST /api/cron/<job>` protegidas por
+   `CRON_SECRET`. Os nomes de job válidos estão na tabela acima e em
+   `apps/worker/src/registry.ts`.
+2. **Definir as duas configurações** em Settings → Secrets and variables → Actions:
+   - `APP_BASE_URL` como **variável** (ex.: `https://minhatv.vercel.app`). É variável, e
+     não segredo, porque uma URL pública não é material secreto — e porque o contexto
+     `secrets` não funciona em `if:` de nível de job, que é onde mora o portão.
+   - `CRON_SECRET` como **segredo**.
+3. **Descomentar os três blocos `- cron:`** em `.github/workflows/cron.yml`.
+
+Enquanto a variável `APP_BASE_URL` não existir, o job é **pulado** em vez de falhar. Ou
+seja: se você descomentar o agendamento antes de configurar a variável, não recebe
+e-mail de erro — mas também não roda nada. Se os jobs parecerem inertes, é o primeiro
+lugar a checar.
+
 ## Desenvolvimento
 
 ```bash

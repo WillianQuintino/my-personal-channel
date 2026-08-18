@@ -1,27 +1,40 @@
-# Agendador dos jobs.
+# Agendador dos jobs do MinhaTV.
 #
-# Por que aqui e não no Vercel Cron: o plano Hobby limita cron a **1× por dia**, com
-# precisão de hora e `maxDuration` de 10 s. Expressões como `0 * * * *` ou `*/30 * * * *`
-# falham no deploy. A detecção de lives precisa rodar a cada poucos minutos, então o
-# agendamento sai da Vercel e vem para cá — gratuito, com granularidade de minutos, e
-# igual nos dois planos, o que não amarra a decisão de assinar Pro depois.
+# ┌─────────────────────────────────────────────────────────────────────────────┐
+# │ AGENDAMENTO PAUSADO. Para ativar, na ordem:                                 │
+# │                                                                             │
+# │  1. Publicar `apps/web` (hoje ela não existe, então não há rota             │
+# │     `/api/cron/*` para chamar — todas as chamadas dariam 404).              │
+# │  2. Definir a VARIÁVEL de repositório `APP_BASE_URL` (Settings → Secrets    │
+# │     and variables → Actions → Variables) e o SEGREDO `CRON_SECRET`.         │
+# │  3. Descomentar os três blocos `- cron:` abaixo.                            │
+# └─────────────────────────────────────────────────────────────────────────────┘
+#
+# Por que o agendamento vive aqui e não no Vercel Cron: o plano Hobby limita cron a
+# **1× por dia**, com precisão de hora e `maxDuration` de 10 s, e expressões como
+# `0 * * * *` ou `*/30 * * * *` falham no deploy. A detecção de lives precisa rodar a
+# cada poucos minutos. O GitHub Actions dá granularidade de minutos, é gratuito, e
+# funciona igual nos dois planos — não amarra a decisão de assinar Pro depois.
 #
 # A cadência do GitHub Actions é "melhor esforço" e pode atrasar alguns minutos. É
 # aceitável: o fallback para a grade VOD cobre a janela em que uma live já começou e
 # ainda não foi detectada.
 #
-# Requer os segredos `APP_BASE_URL` e `CRON_SECRET` no repositório.
+# `APP_BASE_URL` é VARIÁVEL e não segredo por dois motivos. É uma URL pública, não
+# material secreto; e o contexto `secrets` **não** está disponível em `if:` de nível de
+# job, só `vars` está — sem isso o portão abaixo não existiria.
 
 name: Jobs agendados
 
 on:
-  schedule:
-    # Detecção de lives: o job mais sensível a atraso.
-    - cron: '*/5 * * * *'
-    # Pools e inserção a quente.
-    - cron: '*/15 * * * *'
-    # Manutenção diária, às 04:10 UTC (01:10 em São Paulo).
-    - cron: '10 4 * * *'
+  # PAUSADO — ver o cabeçalho. Descomente as três linhas `- cron:` para ativar.
+  # schedule:
+  #   # Detecção de lives: o job mais sensível a atraso.
+  #   - cron: '*/5 * * * *'
+  #   # Pools e inserção a quente.
+  #   - cron: '*/15 * * * *'
+  #   # Manutenção diária, às 04:10 UTC (01:10 em São Paulo).
+  #   - cron: '10 4 * * *'
   workflow_dispatch:
     inputs:
       job:
@@ -35,6 +48,13 @@ permissions:
 jobs:
   disparar:
     runs-on: ubuntu-latest
+    # Portão: sem a variável, o job é PULADO em vez de falhar.
+    #
+    # Esta linha existe porque a versão anterior abortava com `exit 1` quando os
+    # segredos faltavam, o que gerou um e-mail de falha a cada 5 minutos depois do
+    # merge na main. Falhar alto é correto para um app publicado; para um app que ainda
+    # não existe, é só ruído. O portão sobrevive ao religamento do agendamento.
+    if: vars.APP_BASE_URL != ''
     steps:
       - name: Escolhe os jobs pela cadência que disparou
         id: escolher
@@ -55,13 +75,16 @@ jobs:
 
       - name: Executa
         env:
-          BASE_URL: ${{ secrets.APP_BASE_URL }}
+          BASE_URL: ${{ vars.APP_BASE_URL }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
           JOBS: ${{ steps.escolher.outputs.jobs }}
         run: |
           set -euo pipefail
-          if [ -z "${BASE_URL:-}" ] || [ -z "${CRON_SECRET:-}" ]; then
-            echo "::error::defina os segredos APP_BASE_URL e CRON_SECRET"
+
+          # O portão do job já garantiu APP_BASE_URL. Se ela existe e o segredo não,
+          # isso é erro de configuração de verdade — e esse merece falhar alto.
+          if [ -z "${CRON_SECRET:-}" ]; then
+            echo "::error::APP_BASE_URL está definida mas o segredo CRON_SECRET não. Defina-o em Settings → Secrets and variables → Actions → Secrets."
             exit 1
           fi
 
@@ -86,6 +109,6 @@ jobs:
             echo "::endgroup::"
           done
 
-          # Falha registrada como job vermelho: um cron que erra em silêncio é pior que
-          # um cron que não existe.
+          # Aqui a falha alta é legítima: o app está publicado e um endpoint real
+          # devolvendo erro é problema que merece e-mail.
           exit $falhou
